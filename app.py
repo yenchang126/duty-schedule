@@ -4,6 +4,7 @@ Streamlit 網頁介面
 """
 
 import streamlit as st
+import re
 from processor import get_available_dates, process_files
 
 # 頁面設定
@@ -21,13 +22,36 @@ st.markdown("---")
 st.markdown("""
 ### 使用說明
 1. 上傳**勤務表**（如：115.1月.勤1修1----勤務表.xls）
-2. 上傳**空白分配表模板**（如：屏二分隊勤務分配表.xlsx）
-3. 選擇要產生的**日期**
+2. 上傳**空白分配表模板**（如：[20260120] 屏二分隊勤務分配表.xlsx）
+3. 系統會**自動識別日期**，或手動選擇
 4. 點擊「產生分配表」按鈕
 5. 下載產生好的檔案
 """)
 
 st.markdown("---")
+
+
+def extract_date_from_filename(filename: str) -> str:
+    """
+    從檔名中提取日期
+    例如: "[20260120] 屏二分隊勤務分配表.xlsx" -> "0120"
+    """
+    # 嘗試匹配 [YYYYMMDD] 格式
+    match = re.search(r'\[(\d{4})(\d{2})(\d{2})\]', filename)
+    if match:
+        month = match.group(2)
+        day = match.group(3)
+        return f"{month}{day}"
+
+    # 嘗試匹配 YYYYMMDD 格式（無括號）
+    match = re.search(r'(\d{4})(\d{2})(\d{2})', filename)
+    if match:
+        month = match.group(2)
+        day = match.group(3)
+        return f"{month}{day}"
+
+    return None
+
 
 # 檔案上傳區
 col1, col2 = st.columns(2)
@@ -50,32 +74,56 @@ with col2:
 
 st.markdown("---")
 
-# 日期選擇（只有在上傳勤務表後才顯示）
-if duty_file is not None:
-    st.subheader("③ 選擇日期")
+# 日期處理
+selected_date = None
+available_dates = []
 
+if duty_file is not None:
     try:
         available_dates = get_available_dates(duty_file)
-        # 重設檔案指標
         duty_file.seek(0)
-
-        if available_dates:
-            # 將日期格式化顯示
-            date_options = {f"{d[:2]}月{d[2:]}日": d for d in available_dates}
-            selected_display = st.selectbox(
-                "請選擇要產生分配表的日期",
-                options=list(date_options.keys())
-            )
-            selected_date = date_options[selected_display]
-        else:
-            st.error("無法從勤務表中找到有效的日期工作表")
-            selected_date = None
-
     except Exception as e:
         st.error(f"讀取勤務表時發生錯誤：{str(e)}")
-        selected_date = None
-else:
-    selected_date = None
+
+# 自動識別日期或手動選擇
+if duty_file is not None and template_file is not None and available_dates:
+    st.subheader("③ 確認日期")
+
+    # 嘗試從檔名提取日期
+    detected_date = extract_date_from_filename(template_file.name)
+
+    if detected_date and detected_date in available_dates:
+        # 自動識別成功
+        month = detected_date[:2]
+        day = detected_date[2:]
+        st.success(f"✅ 已從檔名自動識別日期：**{month}月{day}日**")
+        selected_date = detected_date
+
+        # 提供手動修改的選項
+        if st.checkbox("手動選擇其他日期"):
+            date_options = {f"{d[:2]}月{d[2:]}日": d for d in available_dates}
+            selected_display = st.selectbox(
+                "選擇日期",
+                options=list(date_options.keys()),
+                index=list(date_options.values()).index(detected_date)
+            )
+            selected_date = date_options[selected_display]
+    else:
+        # 無法自動識別，顯示手動選擇
+        if detected_date:
+            st.warning(f"⚠️ 從檔名識別到日期 {detected_date[:2]}月{detected_date[2:]}日，但勤務表中沒有此日期")
+        else:
+            st.info("無法從檔名自動識別日期，請手動選擇")
+
+        date_options = {f"{d[:2]}月{d[2:]}日": d for d in available_dates}
+        selected_display = st.selectbox(
+            "請選擇要產生分配表的日期",
+            options=list(date_options.keys())
+        )
+        selected_date = date_options[selected_display]
+
+elif duty_file is not None and not available_dates:
+    st.error("無法從勤務表中找到有效的日期工作表")
 
 st.markdown("---")
 
@@ -110,7 +158,7 @@ if duty_file is not None and template_file is not None and selected_date is not 
             st.error(f"處理時發生錯誤：{str(e)}")
             st.exception(e)
 else:
-    st.info("請先完成上方步驟 ①②③")
+    st.info("請先完成上方步驟 ①②")
 
 # 頁尾
 st.markdown("---")
