@@ -21,8 +21,8 @@ st.markdown("---")
 # 說明
 st.markdown("""
 ### 使用說明
-1. 上傳**勤務表**（如：115.1月.勤1修1----勤務表.xls）
-2. 上傳**空白分配表模板**（如：[20260120] 屏二分隊勤務分配表.xlsx）
+1. 上傳**原始勤務表**（如：115.1月.勤1修1----勤務表.xls）
+2. 上傳**差勤系統產生之空白模板**（如：[20260120] 屏二分隊勤務分配表.xlsx）
 3. 系統會**自動識別日期**，或手動選擇
 4. 點擊「產生分配表」按鈕
 5. 下載產生好的檔案
@@ -57,7 +57,7 @@ def extract_date_from_filename(filename: str) -> str:
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("① 上傳勤務表")
+    st.subheader("① 上傳原始勤務表")
     duty_file = st.file_uploader(
         "選擇勤務表檔案 (.xls)",
         type=['xls', 'xlsx'],
@@ -65,7 +65,7 @@ with col1:
     )
 
 with col2:
-    st.subheader("② 上傳空白分配表")
+    st.subheader("② 上傳差勤系統空白模板")
     template_file = st.file_uploader(
         "選擇分配表模板 (.xlsx)",
         type=['xlsx'],
@@ -153,6 +153,16 @@ if duty_file is not None and template_file is not None and selected_date is not 
                 type="primary",
                 use_container_width=True
             )
+
+            # 需自行檢查的提示
+            st.markdown("---")
+            st.markdown("""
+#### ⚠️ 產生好的檔案需自行檢查以下部分：
+1. 「消防查察」至「體技能訓練」之中間欄位需手動輸入
+2. 出動梯次需檢查，如：16車 → 15車
+3. 附記之（XX號消防查察、水源調查）的 XX 如當天有安排需自行輸入
+4. 此系統不會更動「單位人員請休假表」，輸入是什麼，輸出就是什麼
+            """)
 
         except Exception as e:
             st.error(f"處理時發生錯誤：{str(e)}")
